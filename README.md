@@ -20,11 +20,11 @@ Official Persian RTL website and community portal for Caspian RolePlay.
 Do not connect this site to the existing DJ Caspian Supabase project. The Caspian RolePlay portal needs its own dedicated Supabase project. The existing DJ project is unrelated and was not modified.
 
 ### Setup checklist
-1. Create a dedicated Supabase project for Caspian RolePlay.
-2. Run `supabase/caspian_schema.sql` in that project's SQL editor.
-3. In `assets/js/config.js`, set only the project's URL and publishable key. Never place a service-role/secret key in browser code.
-4. Create the first owner account from `tickets.html`.
-5. Follow `backend/README.md` to assign the initial owner role using the Python helper from a private machine.
+1. The dedicated Supabase project `Caspian MTA` is created in `eu-central-1` (Frankfurt).
+2. The initial schema and hardening migration are applied to that project; all five public tables have RLS enabled.
+3. `assets/js/config.js` contains only the project URL and publishable key. Never place a service-role/secret key in browser code.
+4. Create the first owner account from `tickets.html`, then copy its Auth user UUID from Supabase Authentication > Users.
+5. Follow `backend/README.md` to assign the initial `owner` role using the Python helper from a private machine.
 6. Sign in at `admin.html`, add the approved staff list and official donation URL.
 7. Test a normal player account and a staff account before public launch.
 
