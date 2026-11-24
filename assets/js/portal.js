@@ -65,6 +65,28 @@ async function loadAdmin(){
   body.innerHTML=data.length?data.map(t=>'<tr><td>'+esc(t.id.slice(0,8))+'</td><td>'+esc(t.subject)+'</td><td>'+esc(t.category)+'</td><td>'+esc(t.status)+'</td><td>'+fmt(t.created_at)+'</td><td><select data-ticket="'+esc(t.id)+'" aria-label="وضعیت تیکت"><option value="open" '+(t.status==='open'?'selected':'')+'>باز</option><option value="in_progress" '+(t.status==='in_progress'?'selected':'')+'>در حال بررسی</option><option value="answered" '+(t.status==='answered'?'selected':'')+'>پاسخ داده شد</option><option value="closed" '+(t.status==='closed'?'selected':'')+'>بسته</option></select></td></tr>').join(''):'<tr><td colspan="6">تیکتی وجود ندارد.</td></tr>';
   body.querySelectorAll('select[data-ticket]').forEach(s=>s.addEventListener('change',async()=>{const {error}=await supabase.from('tickets').update({status:s.value}).eq('id',s.dataset.ticket);say('admin-status',error?'ذخیره وضعیت ناموفق بود: '+error.message:'وضعیت تیکت به‌روزرسانی شد.',error?'error':'success');}));
   const {data:setting}=await supabase.from('site_settings').select('value').eq('key','donation_url').maybeSingle();if(setting?.value)$('donation-url').value=setting.value;
+  await loadAdminStaff();
+}
+async function loadAdminStaff(){
+  const body=$('staff-admin-list');if(!body)return;
+  const {data,error}=await supabase.from('staff_profiles').select('id,display_name,role_label,department,is_public').order('sort_order');
+  if(error){body.innerHTML='<tr><td colspan="5">'+esc(error.message)+'</td></tr>';return;}
+  body.innerHTML=data.length?data.map(p=>'<tr><td>'+esc(p.display_name)+'</td><td>'+esc(p.role_label)+'</td><td>'+esc(p.department||'—')+'</td><td>'+(p.is_public?'نمایش عمومی':'مخفی')+'</td><td><button data-remove-staff="'+esc(p.id)+'">حذف</button></td></tr>').join(''):'<tr><td colspan="5">عضوی ثبت نشده است.</td></tr>';
+  body.querySelectorAll('[data-remove-staff]').forEach(button=>button.addEventListener('click',async()=>{
+    if(!confirm('این عضو از فهرست عمومی حذف شود؟'))return;
+    const {error}=await supabase.from('staff_profiles').delete().eq('id',button.dataset.removeStaff);
+    say('staff-status',error?'حذف ناموفق بود: '+error.message:'عضو حذف شد.',error?'error':'success');
+    await loadAdminStaff();
+  }));
+}
+$('add-staff')?.addEventListener('click',async()=>{
+  if(!supabase){say('staff-status','اتصال دیتابیس تنظیم نشده است.','error');return;}
+  const display_name=$('staff-name').value.trim(),role_label=$('staff-role').value,department=$('staff-department').value.trim(),avatar_url=$('staff-avatar').value.trim(),bio=$('staff-bio').value.trim(),sort_order=Number($('staff-order').value||10);
+  if(display_name.length<2){say('staff-status','نام نمایشی را وارد کن.','error');return;}
+  if(avatar_url && !/^https:\/\//i.test(avatar_url)){say('staff-status','لینک تصویر باید با https:// شروع شود.','error');return;}
+  const {error}=await supabase.from('staff_profiles').insert({display_name,role_label,department,avatar_url:avatar_url||null,bio,sort_order,is_public:true});
+  say('staff-status',error?'ثبت عضو ناموفق بود: '+error.message:'عضو تیم با موفقیت ثبت شد.',error?'error':'success');
+  if(!error){$('staff-name').value='';$('staff-department').value='';$('staff-avatar').value='';$('staff-bio').value='';await loadAdminStaff();}
 }
 $('save-donation')?.addEventListener('click',async()=>{
   const url=$('donation-url').value.trim();
