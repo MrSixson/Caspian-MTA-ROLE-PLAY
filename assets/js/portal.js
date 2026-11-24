@@ -118,7 +118,7 @@ $('add-staff')?.addEventListener('click',async()=>{
   const {error}=await supabase.from('staff_profiles').insert({display_name,role_label,department,avatar_url:avatar_url||null,bio,sort_order,is_public:true});
   say('staff-status',error?'ثبت عضو ناموفق بود: '+error.message:'عضو تیم با موفقیت ثبت شد.',error?'error':'success');
   if(!error){$('staff-name').value='';$('staff-department').value='';$('staff-avatar').value='';$('staff-bio').value='';await loadAdminStaff();}
-}
+});
 $('save-donation')?.addEventListener('click',async()=>{
   const url=$('donation-url').value.trim();
   if(!/^https:\/\//i.test(url)){say('settings-status','لینک باید با https:// شروع شود.','error');return;}
