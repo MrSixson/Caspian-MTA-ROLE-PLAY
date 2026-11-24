@@ -63,7 +63,10 @@ create policy "read own role rows" on public.user_roles for select to authentica
 using ((select auth.uid()) = user_id);
 
 create policy "public reads published staff" on public.staff_profiles for select to anon, authenticated
-using (is_public = true or exists (
+using (is_public = true);
+
+create policy "admins read hidden staff profiles" on public.staff_profiles for select to authenticated
+using (exists (
   select 1 from public.user_roles r
   where r.user_id = (select auth.uid())
   and r.role in ('owner','founder','supervisor','admin')
