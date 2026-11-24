@@ -2,7 +2,7 @@
 
 This helper assigns a role to an existing Supabase Auth user. It must run locally by the project owner.
 
-1. Create the user's account from the portal sign-up form.
+1. Create the owner's account from the portal sign-up form at `tickets.html`. The live project is `snzrtwvetwlajhyoebag`.
 2. In Supabase Authentication > Users, copy that user's UUID.
 3. Set environment variables in a private terminal:
    - SUPABASE_URL
