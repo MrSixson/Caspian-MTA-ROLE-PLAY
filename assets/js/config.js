@@ -1,8 +1,8 @@
 // Public browser configuration. Only the Supabase publishable key belongs here.
 // Never put a service_role/secret key in this file.
 window.CASPIAN_CONFIG = {
-  supabaseUrl: "",
-  supabasePublishableKey: "",
+  supabaseUrl: "https://snzrtwvetwlajhyoebag.supabase.co",
+  supabasePublishableKey: "sb_publishable_FJjOIbqcgU8tCC-V3v0wDg_XbhgAaQA",
   donationUrl: "",
   discordUrl: "https://discord.gg/nevmNy93pN",
   teamspeakUrl: "https://caspian.mta.ir",
