@@ -92,8 +92,9 @@ using (
 create policy "ticket owner and staff add messages" on public.ticket_messages for insert to authenticated
 with check (
   (select auth.uid()) = author_id and (
-    exists (select 1 from public.tickets t where t.id=ticket_id and t.user_id=(select auth.uid()))
-    or exists (select 1 from public.user_roles r where r.user_id=(select auth.uid()) and r.role in ('owner','founder','supervisor','admin','moderator','support'))
+    (is_staff = false and exists (select 1 from public.tickets t where t.id=ticket_id and t.user_id=(select auth.uid())))
+    or
+    (is_staff = true and exists (select 1 from public.user_roles r where r.user_id=(select auth.uid()) and r.role in ('owner','founder','supervisor','admin','moderator','support')))
   )
 );
 
@@ -105,8 +106,9 @@ with check (exists (select 1 from public.user_roles r where r.user_id=(select au
 
 -- Explicit Data API grants: tables are not automatically exposed in current Supabase projects.
 grant select on public.staff_profiles to anon, authenticated;
-grant select, insert, update, delete on public.user_roles to authenticated;
+grant select on public.user_roles to authenticated;
 grant select, insert, update on public.tickets to authenticated;
 grant select, insert on public.ticket_messages to authenticated;
 grant select, insert, update, delete on public.staff_profiles to authenticated;
-grant select, insert, update on public.site_settings to authenticated;
+grant select on public.site_settings to anon, authenticated;
+grant insert, update on public.site_settings to authenticated;
