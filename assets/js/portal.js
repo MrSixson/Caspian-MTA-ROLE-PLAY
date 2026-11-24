@@ -2,6 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.95.3';
 const cfg = window.CASPIAN_CONFIG || {};
 const ready = Boolean(cfg.supabaseUrl && cfg.supabasePublishableKey);
 const supabase = ready ? createClient(cfg.supabaseUrl, cfg.supabasePublishableKey) : null;
+let activeTicketId = null;
+let activeStaffMode = false;
 const $ = (id) => document.getElementById(id);
 const say = (id, message, kind='') => { const el=$(id); if(el){el.textContent=message;el.className='status '+kind;} };
 const esc = (value='') => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -14,9 +16,32 @@ async function updateTicketView(){
   if(user && $('ticket-list')){
     const {data,error}=await supabase.from('tickets').select('id,subject,category,status,created_at').order('created_at',{ascending:false});
     if(error){$('ticket-list').textContent='خطا در دریافت تیکت‌ها: '+error.message;return;}
-    $('ticket-list').innerHTML=data.length?'<div class="table-wrap"><table><thead><tr><th>موضوع</th><th>دسته</th><th>وضعیت</th><th>تاریخ</th></tr></thead><tbody>'+data.map(t=>'<tr><td>'+esc(t.subject)+'</td><td>'+esc(t.category)+'</td><td>'+esc(t.status)+'</td><td>'+fmt(t.created_at)+'</td></tr>').join('')+'</tbody></table></div>':'<div class="empty">هنوز تیکتی ثبت نکرده‌ای.</div>';
+    $('ticket-list').innerHTML=data.length?'<div class="table-wrap"><table><thead><tr><th>موضوع</th><th>دسته</th><th>وضعیت</th><th>تاریخ</th><th></th></tr></thead><tbody>'+data.map(t=>'<tr><td>'+esc(t.subject)+'</td><td>'+esc(t.category)+'</td><td>'+esc(t.status)+'</td><td>'+fmt(t.created_at)+'</td><td><button class="btn secondary" data-open-ticket="'+esc(t.id)+'">گفت‌وگو</button></td></tr>').join('')+'</tbody></table></div>':'<div class="empty">هنوز تیکتی ثبت نکرده‌ای.</div>';
+    $('ticket-list').querySelectorAll('[data-open-ticket]').forEach(b=>b.addEventListener('click',()=>openTicketThread(b.dataset.openTicket,false)));
   }
 }
+async function openTicketThread(ticketId,staffMode){
+  activeTicketId=ticketId;activeStaffMode=staffMode;
+  const panel=$(staffMode?'admin-ticket-thread':'ticket-thread');if(panel)panel.classList.remove('hidden');
+  await loadTicketMessages();
+}
+async function loadTicketMessages(){
+  const root=$(activeStaffMode?'admin-ticket-messages':'ticket-messages');if(!root||!activeTicketId)return;
+  const {data,error}=await supabase.from('ticket_messages').select('message,is_staff,created_at,author_id').eq('ticket_id',activeTicketId).order('created_at');
+  if(error){root.textContent='خطا در دریافت پیام‌ها: '+error.message;return;}
+  root.innerHTML=data.length?data.map(m=>'<div class="info-card" style="margin-bottom:10px"><span class="tag">'+(m.is_staff?'پاسخ تیم کاسپین':'پیام بازیکن')+' · '+fmt(m.created_at)+'</span><p style="margin:8px 0 0;white-space:pre-wrap">'+esc(m.message)+'</p></div>').join(''):'<div class="empty">هنوز پیامی در این گفت‌وگو ثبت نشده است.</div>';
+}
+async function sendTicketMessage(staffMode){
+  if(!activeTicketId)return;
+  const field=$(staffMode?'admin-ticket-reply':'ticket-reply'),status=staffMode?'admin-reply-status':'reply-status',message=field.value.trim();
+  if(message.length<1){say(status,'پیام خالی قابل ارسال نیست.','error');return;}
+  const user=await currentUser();
+  const {error}=await supabase.from('ticket_messages').insert({ticket_id:activeTicketId,author_id:user.id,message,is_staff:staffMode});
+  if(error){say(status,'ارسال پیام ناموفق بود: '+error.message,'error');return;}
+  field.value='';say(status,'پیام ارسال شد.','success');await loadTicketMessages();
+}
+$('send-ticket-reply')?.addEventListener('click',()=>sendTicketMessage(false));
+$('send-admin-reply')?.addEventListener('click',()=>sendTicketMessage(true));
 async function authAction(mode){
   if(!supabase){say('auth-status','اتصال دیتابیس تنظیم نشده است. فایل assets/js/config.js باید با URL و کلید عمومی پروژه پر شود.','error');return;}
   const email=$('email')?.value.trim(),password=$('password')?.value;
@@ -62,7 +87,8 @@ async function loadAdmin(){
   const body=$('admin-tickets');if(!body)return;
   const {data,error}=await supabase.from('tickets').select('id,subject,category,status,created_at').order('created_at',{ascending:false}).limit(100);
   if(error){body.innerHTML='<tr><td colspan="6">'+esc(error.message)+'</td></tr>';return;}
-  body.innerHTML=data.length?data.map(t=>'<tr><td>'+esc(t.id.slice(0,8))+'</td><td>'+esc(t.subject)+'</td><td>'+esc(t.category)+'</td><td>'+esc(t.status)+'</td><td>'+fmt(t.created_at)+'</td><td><select data-ticket="'+esc(t.id)+'" aria-label="وضعیت تیکت"><option value="open" '+(t.status==='open'?'selected':'')+'>باز</option><option value="in_progress" '+(t.status==='in_progress'?'selected':'')+'>در حال بررسی</option><option value="answered" '+(t.status==='answered'?'selected':'')+'>پاسخ داده شد</option><option value="closed" '+(t.status==='closed'?'selected':'')+'>بسته</option></select></td></tr>').join(''):'<tr><td colspan="6">تیکتی وجود ندارد.</td></tr>';
+  body.innerHTML=data.length?data.map(t=>'<tr><td>'+esc(t.id.slice(0,8))+'</td><td>'+esc(t.subject)+'</td><td>'+esc(t.category)+'</td><td>'+esc(t.status)+'</td><td>'+fmt(t.created_at)+'</td><td><select data-ticket="'+esc(t.id)+'" aria-label="وضعیت تیکت"><option value="open" '+(t.status==='open'?'selected':'')+'>باز</option><option value="in_progress" '+(t.status==='in_progress'?'selected':'')+'>در حال بررسی</option><option value="answered" '+(t.status==='answered'?'selected':'')+'>پاسخ داده شد</option><option value="closed" '+(t.status==='closed'?'selected':'')+'>بسته</option></select> <button class="btn secondary" data-ticket-thread="'+esc(t.id)+'">پاسخ</button></td></tr>').join(''):'<tr><td colspan="6">تیکتی وجود ندارد.</td></tr>';
+  body.querySelectorAll('[data-ticket-thread]').forEach(b=>b.addEventListener('click',()=>openTicketThread(b.dataset.ticketThread,true)));
   body.querySelectorAll('select[data-ticket]').forEach(s=>s.addEventListener('change',async()=>{const {error}=await supabase.from('tickets').update({status:s.value}).eq('id',s.dataset.ticket);say('admin-status',error?'ذخیره وضعیت ناموفق بود: '+error.message:'وضعیت تیکت به‌روزرسانی شد.',error?'error':'success');}));
   const {data:setting}=await supabase.from('site_settings').select('value').eq('key','donation_url').maybeSingle();if(setting?.value)$('donation-url').value=setting.value;
   await loadAdminStaff();
