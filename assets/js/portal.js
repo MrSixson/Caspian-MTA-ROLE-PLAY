@@ -4,6 +4,7 @@ const ready = Boolean(cfg.supabaseUrl && cfg.supabasePublishableKey);
 const supabase = ready ? createClient(cfg.supabaseUrl, cfg.supabasePublishableKey) : null;
 let activeTicketId = null;
 let activeStaffMode = false;
+let activeAdminRoles = [];
 const $ = (id) => document.getElementById(id);
 const say = (id, message, kind='') => { const el=$(id); if(el){el.textContent=message;el.className='status '+kind;} };
 const esc = (value='') => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -79,10 +80,14 @@ async function initAdmin(){
     const {data:roles,error:roleError}=await supabase.from('user_roles').select('role').eq('user_id',(await currentUser()).id);
     if(roleError||!roles?.length){await supabase.auth.signOut();say('admin-status','این حساب هیچ دسترسی مدیریتی ثبت‌شده‌ای ندارد.','error');return;}
     const allowed=roles.some(x=>['owner','founder','supervisor','admin','moderator','support'].includes(x.role));
+    activeAdminRoles=roles.map(x=>x.role);
     if(!allowed){await supabase.auth.signOut();say('admin-status','سطح دسترسی برای ورود به پنل کافی نیست.','error');return;}
+    const canManageSite=activeAdminRoles.some(role=>['owner','founder','supervisor','admin'].includes(role));
+    document.querySelectorAll('[data-admin-only]').forEach(section=>section.classList.toggle('hidden',!canManageSite));
     $('admin-login').classList.add('hidden');$('admin-dashboard').classList.remove('hidden');say('admin-status','دسترسی تأیید شد.','success');await loadAdmin();
   });
 }
+$('admin-sign-out')?.addEventListener('click',async()=>{await supabase?.auth.signOut();activeAdminRoles=[];$('admin-dashboard')?.classList.add('hidden');$('admin-login')?.classList.remove('hidden');say('admin-status','از پنل خارج شدی.','');});
 async function loadAdmin(){
   const body=$('admin-tickets');if(!body)return;
   const {data,error}=await supabase.from('tickets').select('id,subject,category,status,created_at').order('created_at',{ascending:false}).limit(100);
@@ -91,7 +96,7 @@ async function loadAdmin(){
   body.querySelectorAll('[data-ticket-thread]').forEach(b=>b.addEventListener('click',()=>openTicketThread(b.dataset.ticketThread,true)));
   body.querySelectorAll('select[data-ticket]').forEach(s=>s.addEventListener('change',async()=>{const {error}=await supabase.from('tickets').update({status:s.value}).eq('id',s.dataset.ticket);say('admin-status',error?'ذخیره وضعیت ناموفق بود: '+error.message:'وضعیت تیکت به‌روزرسانی شد.',error?'error':'success');}));
   const {data:setting}=await supabase.from('site_settings').select('value').eq('key','donation_url').maybeSingle();if(setting?.value)$('donation-url').value=setting.value;
-  await loadAdminStaff();
+  if(activeAdminRoles.some(role=>['owner','founder','supervisor','admin'].includes(role))) await loadAdminStaff();
 }
 async function loadAdminStaff(){
   const body=$('staff-admin-list');if(!body)return;
